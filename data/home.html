@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Camper Jack Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="bootstrap/bootstrap.min.css" media="screen">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script>
+    window.jQuery || document.write('<script src="jquery/jquery-3.4.1.min.js">\x3C/script>')
+  </script>
+  <script src="bootstrap/bootstrap.min.js"></script>
+  <script>
+    //**************************************************************************
+    // setup Websockets
+    //**************************************************************************
+    // use below when hosted on ESP8266
+    //var wsUri = 'ws://' + location.hostname + ':81/';
+    // use below for connecting to ESP server via IP address (when testing code on PC)
+    // var wsUri = 'ws://192.168.1.120:81/';
+    // use below for connecting to Nodejs server (when testing code on PC)
+    var wsUri = 'ws://localhost:80/';
+    var output;
+    var echo = "";
+    var requestMsg = []; // array of messages to be sent out the websocket.
+    //**************************************************************************
+    // Init - called when Event Listener loads
+    //**************************************************************************
+    function init() {
+      console.log("Initiating Home page");
+      //openWebsocket();
+      //formatRequest("queryGPIO", "2");
+    }
+    //**************************************************************************
+    // open Websockets - as the name suggests
+    //**************************************************************************
+
+    websocket = new WebSocket(wsUri);
+
+    websocket.onopen = function () {
+        console.log("Websocket opened.");
+        while (requestMsg.length > 0) {
+          message = requestMsg.pop();
+          console.log("Popping message ", message, " from queue.");
+          websocket.send(message);
+          console.log("Message queue now empty.");          
+        }
+      }
+
+      websocket.onclose = function (evt) {
+        console.log("Websocket disconnected");
+      };
+
+      websocket.onmessage = function (evt) {
+        console.log("Websocket message recieved.")
+        onMessage(evt);
+      };
+
+      websocket.onerror = function (evt) {
+        console.log("Websocket Error! " + evt.data);
+        document.getElementById("pageStatus").style.color = "red";
+        document.getElementById("pageStatus").innerHTML = "Failed to Connect.  Reload to Retry.";
+      };
+
+
+    //**************************************************************************
+    // Query Websockets
+    // Take action as required on webSocket
+    // Either queues or sends messages based on readyState of the socket
+    //**************************************************************************
+    function queryWebSocket(request) {
+/*       if (websocket.readyState == 3) {
+        console.log("Websocket not open, opening.")
+        openWebsocket();
+      } */
+      console.log("Requesting: ", request);
+      if (websocket.readyState !== 1) {
+        requestMsg.push(request);
+        console.log("request pushed to array");
+      } else {
+/*         if (websocket.bufferedAmount == 0) {
+          websocket.send(request);
+        } */
+        websocket.send(request);
+        // check if websocket is open here
+        console.log("request sent to websocket");
+      }
+
+    }
+    //**************************************************************************
+    // Runs when websocket is recieved or is sent
+    //**************************************************************************
+    function onMessage(evt) {
+      var messageRecieved = evt.data;
+      var jsonMessage = JSON.parse(messageRecieved);
+      console.log("Message Recieved is: " + messageRecieved);
+      document.getElementById("pageStatus").style.visibility = "hidden";
+      
+      if (jsonMessage.echo == "Setting GPIO") {
+        console.log("Verifying GPIO Status: ", jsonMessage.status);
+        if (jsonMessage.status.includes("on")) {
+          console.log("Set GPIO status ON");
+          document.getElementById("status").innerHTML = "GPIO is: " + "ON";
+          //document.getElementById("b1").focus();
+          //console.log("Setting Focus B1");
+        } else {
+          console.log("Set GPIO status OFF");
+          document.getElementById("status").innerHTML = "GPIO is: " + "OFF";
+          //document.getElementById("b2").focus();
+        }
+      } else if (jsonMessage.echo == "Status GPIO") {
+        console.log("Recieved GPIO Status");
+        document.getElementById("status").innerHTML = "GPIO is: " + jsonMessage.status;
+        if (jsonMessage.status == "ON") {
+          //document.getElementById("b1").focus();
+          //console.log("Setting Focus B1");
+        } else {
+          //document.getElementById("b2").focus();
+          //console.log("Setting Focus B2");
+        }
+      } else {
+        console.log("ERROR: Unknown message recieved.")
+      }
+    }
+    // This listener is required to action websocket requests.
+    window.addEventListener("load", init, false);
+  </script>
+  <script>
+    $(document).ready(function () {
+      console.log('Document ready.');
+    });
+    //**************************************************************************
+    // setIO
+    // Sets required state of chosen IO by using an AJAX request
+    //**************************************************************************
+    function setIO(io, state) {
+      console.log("IO ", io, " requested with state: ", state, ".");
+      request = new XMLHttpRequest();
+      requestData = "GPIO_" + io + "_" + state;
+      request.open("GET", requestData, true);
+      request.send(); //Used to say NULL in parentheses...
+      console.log("AJAX request sent");
+      //document.getElementById("status").innerHTML = "GPIO is: " + state;
+    }
+    //**************************************************************************
+    // formatRequest
+    // Formats json Message to be sent with parsed in request (type) and
+    // requestData
+    //**************************************************************************
+    function formatRequest(request, requestData) {
+      var jsonRequest = JSON.stringify({
+        "type": request,
+        "data": requestData
+      });
+      console.log("Sending Request Data.");
+      console.log(jsonRequest);
+      queryWebSocket(jsonRequest);
+    }
+  </script>
+  <style>
+    #footer {
+      position: absolute;
+      bottom: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container" style="text-align:center;">
+    <h1> Camper Jack Controller </h1>
+        <p id="pageStatus">No Current Status</p>
+    <!-- Buttons ================================================== -->
+    <div class="container">
+      <br />
+
+        <!--// Left side of Wemos D1 Mini Pro as seen aligned with top writing.
+            #define LF_UP_PIN D0 // GPIO16 //Left Front Up. Up corresponds to +12V on the RED wire.
+            #define LF_DOWN_PIN D5 // GPIO14 
+            #define RF_UP_PIN D6 // GPIO12 
+            #define RF_DOWN_PIN D7 // GPIO13 
+            // Right side of Wemos D1 Mini Pro as seen aligned with top writing.
+            #define LR_UP_PIN D1 // GPIO5 
+            #define LR_DOWN_PIN D2 // GPIO4
+            #define RR_UP_PIN D3 // GPIO0
+            #define RR_DOWN_PIN D4 // GPIO2 -->
+      <table class="table">
+        <tr>
+          <th>Left Front</th>
+          <th>Right Front</th>
+        </tr>
+        <tr>
+          <!-- LF_UP -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(16, 'ON');">UP</button></td>
+          <!-- RF_UP -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(12, 'ON');">UP</button></td>
+        </tr>
+        <tr>
+          <!-- LF_DOWN -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(14, 'ON');">DOWN</button></td>
+          <!-- RF_DOWN -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(13, 'ON');">DOWN</button></td>
+        </tr>
+      </table>
+
+      <table class="table">
+        <tr>
+          <th>Left Rear</th>
+          <th>Right Rear</th>
+        </tr>
+        <tr>
+          <!-- LR_UP -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(5, 'ON');">UP</button></td>
+          <!-- RR_UP -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(0, 'ON');">UP</button></td>
+        </tr>
+        <tr>
+          <!-- LR_DOWN -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(4, 'ON');">DOWN</button></td>
+          <!-- RR_DOWN -->
+          <td><button class="btn btn-primary btn-lg btn-block" onclick="setIO(2, 'ON');">DOWN</button></td>
+        </tr>
+      </table>
+
+      <button class="btn btn-danger btn-lg btn-block" onclick="setIO(99, 'ON')">STOP</button>
+
+
+            <h3 id="status">GPIO is Undefined</h3>
+    </div>
+  </div>
+  <div class="container" style="text-align:right;" id="footer">
+    <p>bruce.a.haines@gmail.com</p>
+  </div>
+</body>
+
+</html>
