@@ -7,6 +7,8 @@
 
 extern WebSocketsServer webSocketServer;
 
+extern void turnOffAllJacks();
+
 String processGPIO(JsonObject jsonData);
 void parseWebsocketText(String text, uint8_t num);
 

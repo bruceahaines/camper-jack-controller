@@ -12,7 +12,7 @@ void parseWebsocketText(String text, uint8_t num) {
   String message = "{\"echo\":\"Invalid Message Received.\"}";
 
   DynamicJsonDocument jsonDoc(1024);
-
+  // Deserialize json message.
   auto error = deserializeJson(jsonDoc, text);
   if (error) {
     Serial.println("Failed to parse web socket");
@@ -22,14 +22,8 @@ void parseWebsocketText(String text, uint8_t num) {
   }
 
   JsonObject jsonData = jsonDoc.as<JsonObject>();  
-  //const char* type = jsonData["type"];
-  //const char* data = jsonData["data"];
-  if ((jsonData["type"]) == "queryGPIO") {
-    Serial.println("Processing queryGPIO");
-    message = processGPIO(jsonData);
-  } else {
-    Serial.println("Unknown Request Type");
-  }
+  message = processGPIO(jsonData);
+
   Serial.println("Sending Websocket Message:");
   Serial.println(message);
   webSocketServer.sendTXT(num, message.c_str(), message.length());  // Send update data
@@ -38,28 +32,44 @@ void parseWebsocketText(String text, uint8_t num) {
 // Echo GPIO status to Client
 //******************************************************************************************************************************
 String processGPIO(JsonObject jsonData) {
-  const char* GPIO = "";
-  String state = "";
-  int valGPIO = 0;
+
+  int pinNum;
+  int pinState;
+  int pinReadState;
   String jsonLocalName = "";
-  GPIO = jsonData["data"];
-  Serial.print("GPIO from Data is: "); Serial.println(GPIO);
-  //  GPIO = GPIO.substring(6,7);
-  valGPIO = atoi(GPIO);
-  Serial.print("Processing GPIO: "); Serial.println(valGPIO);
+  
+  // Get pin# and from JSON data
+  Serial.println("Processing pinNum and pinState");
+  pinNum = atoi(jsonData["pinNum"]);  
+  pinState = atoi(jsonData["pinState"]);
+
+  Serial.print("pin is: "); Serial.println(pinNum);
+  Serial.print("pin state is: "); Serial.println(pinState);
+  
+  if (pinNum == 99) {
+    turnOffAllJacks();
+    Serial.println("STOP BUTTON PRESSED");
+  }
+  else {
+    turnOffAllJacks();
+    Serial.print("Processing GPIO: "); Serial.println(pinNum);
+    digitalWrite(pinNum, HIGH); // High is on.
+  }
+  
   //Serial.print("Reading GPIO gives: "); Serial.println(digitalRead(valGPIO));
-/*   if (digitalRead(valGPIO) == 1) {  // active low LED on WEMOS D1 MINI!
-    state = "OFF";
+/*   if (digitalRead(pinNum) == 1) {  // active low LED on WEMOS D1 MINI!
+    pinReadState = "ON";
   } 
   else {
-    state = "ON";
+    pinReadState = "OFF";
   } */
-  
-  const size_t bufferSize = JSON_OBJECT_SIZE(2); // 2 is number of key:value pairs
+  //
+  const size_t bufferSize = JSON_OBJECT_SIZE(3); // 3 is number of key:value pairs
   DynamicJsonDocument jsonDoc(1024);
   JsonObject root = jsonDoc.as<JsonObject>();  
-  root["echo"] = "Status GPIO";
-  root["status"] = state;
+  root["echo"] = "Pin read state";
+  root["pinNum"] = pinNum;
+  root["pinReadState"] = digitalRead(pinNum);
   
   serializeJson(root, jsonLocalName);  
   Serial.println("Sending processed GPIO status");

@@ -23,7 +23,7 @@
     var wsUri = 'ws://localhost:80/';
     var output;
     var echo = "";
-    var requestMsg = []; // array of messages to be sent out the websocket.
+    var gbl_requestMsg = []; // array of messages to be sent out the websocket.
     //**************************************************************************
     // Init - called when Event Listener loads
     //**************************************************************************
@@ -36,28 +36,29 @@
     // open Websockets - as the name suggests
     //**************************************************************************
 
-    websocket = new WebSocket(wsUri);
+    gbl_websocket = new WebSocket(wsUri);
 
-    websocket.onopen = function () {
+    gbl_websocket.onopen = function () {
         console.log("Websocket opened.");
-        while (requestMsg.length > 0) {
-          message = requestMsg.pop();
+        // If we had messages pushed before websocket was ready, pop them now.
+        while (gbl_requestMsg.length > 0) {
+          message = gbl_requestMsg.pop();
           console.log("Popping message ", message, " from queue.");
-          websocket.send(message);
+          gbl_websocket.send(message);
           console.log("Message queue now empty.");          
         }
       }
 
-      websocket.onclose = function (evt) {
+      gbl_websocket.onclose = function (evt) {
         console.log("Websocket disconnected");
       };
 
-      websocket.onmessage = function (evt) {
+      gbl_websocket.onmessage = function (evt) {
         console.log("Websocket message recieved.")
         onMessage(evt);
       };
 
-      websocket.onerror = function (evt) {
+      gbl_websocket.onerror = function (evt) {
         console.log("Websocket Error! " + evt.data);
         document.getElementById("pageStatus").style.color = "red";
         document.getElementById("pageStatus").innerHTML = "Failed to Connect.  Reload to Retry.";
@@ -69,27 +70,25 @@
     // Take action as required on webSocket
     // Either queues or sends messages based on readyState of the socket
     //**************************************************************************
-    function queryWebSocket(request) {
-/*       if (websocket.readyState == 3) {
+/*     function queryWebSocket(request) {
+      if (websocket.readyState == 3) {
         console.log("Websocket not open, opening.")
         openWebsocket();
-      } */
+      }
       console.log("Requesting: ", request);
       if (websocket.readyState !== 1) {
-        requestMsg.push(request);
+        gbl_requestMsg.push(request);
         console.log("request pushed to array");
       } else {
-/*         if (websocket.bufferedAmount == 0) {
-          websocket.send(request);
-        } */
+
         websocket.send(request);
         // check if websocket is open here
         console.log("request sent to websocket");
       }
 
-    }
+    } */
     //**************************************************************************
-    // Runs when websocket is recieved or is sent
+    // Runs when websocket is recieved or is sent(?)
     //**************************************************************************
     function onMessage(evt) {
       var messageRecieved = evt.data;
@@ -97,31 +96,19 @@
       console.log("Message Recieved is: " + messageRecieved);
       document.getElementById("pageStatus").style.visibility = "hidden";
       
-      if (jsonMessage.echo == "Setting GPIO") {
-        console.log("Verifying GPIO Status: ", jsonMessage.status);
-        if (jsonMessage.status.includes("on")) {
-          console.log("Set GPIO status ON");
-          document.getElementById("status").innerHTML = "GPIO is: " + "ON";
-          //document.getElementById("b1").focus();
-          //console.log("Setting Focus B1");
-        } else {
-          console.log("Set GPIO status OFF");
-          document.getElementById("status").innerHTML = "GPIO is: " + "OFF";
-          //document.getElementById("b2").focus();
-        }
-      } else if (jsonMessage.echo == "Status GPIO") {
-        console.log("Recieved GPIO Status");
-        document.getElementById("status").innerHTML = "GPIO is: " + jsonMessage.status;
-        if (jsonMessage.status == "ON") {
-          //document.getElementById("b1").focus();
-          //console.log("Setting Focus B1");
-        } else {
-          //document.getElementById("b2").focus();
-          //console.log("Setting Focus B2");
-        }
-      } else {
-        console.log("ERROR: Unknown message recieved.")
-      }
+      console.log("Set pin " + 
+                  jsonMessage.pinNum + 
+                  " to " + 
+                  jsonMessage.pinReadState);
+
+      document.getElementById("status").innerHTML = "Pin " +
+            jsonMessage.pinNum +
+            " is " +
+            jsonMessage.pinReadState + 
+            ".";
+      
+      //document.getElementById("b1").focus();
+      //console.log("Setting Focus B1");
     }
     // This listener is required to action websocket requests.
     window.addEventListener("load", init, false);
@@ -132,31 +119,43 @@
     });
     //**************************************************************************
     // setIO
-    // Sets required state of chosen IO by using an AJAX request
+    // Sets required state of chosen IO by using a websocket msg
     //**************************************************************************
     function setIO(io, state) {
-      console.log("IO ", io, " requested with state: ", state, ".");
+
+      // serialize the request into JSON
+      var jsonRequest = JSON.stringify({
+        "pinNum": io,
+        "pinState": state
+      }); 
+
+      console.log("Serialized websocket msg:");
+      console.log(jsonRequest);
+
+      // Use websockets to send message to MCU.
+      if (gbl_websocket.readyState !== 1) {
+        gbl_requestMsg.push(jsonRequest);
+        console.log("Websocket not ready, msg pushed to array.");
+      } 
+      else { // websocket.readyState == 1
+        gbl_websocket.send(jsonRequest);
+        // check if websocket is open here
+        console.log("Websocket msg sent.");
+      }
+
+      // Prevously done with an AJAX request to open a file.
+      // On MCU we handled it as fileNotFound and then compare strings.
+      // Uncomment this to change IO via AJAX
+      /*console.log("IO ", io, " requested with state: ", state, ".");
       request = new XMLHttpRequest();
       requestData = "GPIO_" + io + "_" + state;
       request.open("GET", requestData, true);
       request.send(); //Used to say NULL in parentheses...
-      console.log("AJAX request sent");
+      console.log("AJAX request sent");*/
       //document.getElementById("status").innerHTML = "GPIO is: " + state;
+
     }
-    //**************************************************************************
-    // formatRequest
-    // Formats json Message to be sent with parsed in request (type) and
-    // requestData
-    //**************************************************************************
-    function formatRequest(request, requestData) {
-      var jsonRequest = JSON.stringify({
-        "type": request,
-        "data": requestData
-      });
-      console.log("Sending Request Data.");
-      console.log(jsonRequest);
-      queryWebSocket(jsonRequest);
-    }
+
   </script>
   <style>
     #footer {
