@@ -1,16 +1,17 @@
-#ifndef LCL_FILE_FUNCTIONS_H
-#define LCL_FILE_FUNCTIONS_H
+#ifndef FILE_UTILS_H
+#define FILE_UTILS_H
 
 #include <Arduino.h>
-//#include <ArduinoOTA.h>
-#include <ESP8266WebServer.h>
-#include <FS.h>
+#include <WebServer.h>
 #include <stdlib.h>
+#include <FS.h>
+#include <SPIFFS.h>
+#include <globalDefines.h>
 
-extern ESP8266WebServer webServer;
+extern WebServer webServer;
 
 void turnOffAllJacks();
-String formatBytes(size_t bytes);
+String getSizeSuffix(size_t bytes);
 String getContentType(String filename);
 bool handleFileRead(String path);
 void handleFileUpload();
@@ -18,4 +19,4 @@ void handleFileDelete();
 void handleFileCreate();
 void handleFileList();
 
-#endif //LCL_FILE_FUNCTIONS_H
+#endif //FILE_UTILS_H

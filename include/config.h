@@ -1,9 +1,9 @@
-#ifndef LCL_JSON_H
-#define LCL_JSON_H
+#ifndef CONFIG_H
+#define CONFIG_H
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <FS.h>
+#include <SPIFFS.h>
 
 extern char ssid[];
 extern char password[];
@@ -11,9 +11,7 @@ extern char hostName[];
 extern char apSSID[];
 extern char apPASS[];
 
-extern File fsUploadFile;
-
 bool loadConfig();
 bool saveConfig();
 
-#endif //LCL_JSON_H
+#endif //CONFIG_H

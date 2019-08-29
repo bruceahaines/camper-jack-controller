@@ -1,4 +1,4 @@
-#include <LCLJson.h>
+#include <config.h>
 
 //******************************************************************************************************************************
 // JSON config file actions
@@ -22,8 +22,8 @@ bool loadConfig() {
     std::unique_ptr<char[]> buf(new char[size]);              // buffer is named 'buf' and is set to the size of the opened json file
     configFile.readBytes(buf.get(), size);                    // read bytes from congfigFile (read from SPIFFs) into the file buffer named 'buf'
   
-  const size_t bufferSize = JSON_OBJECT_SIZE(10);
-  DynamicJsonDocument jsonDoc(1024);
+  const size_t bufferSize = JSON_OBJECT_SIZE(5) + 30*5;
+  DynamicJsonDocument jsonDoc(bufferSize);
   auto error = deserializeJson(jsonDoc, buf.get());
   
   if (error) {
@@ -49,8 +49,8 @@ bool loadConfig() {
 //******************************************************************************************************************************
 bool saveConfig() {
 
-  const size_t bufferSize = JSON_OBJECT_SIZE(10);
-  DynamicJsonDocument jsonDoc(1024);
+  const size_t bufferSize = JSON_OBJECT_SIZE(5) + 30*5; //5 is #elements, 30*5 is #characters in strings
+  DynamicJsonDocument jsonDoc(bufferSize);
   JsonObject rootSave = jsonDoc.as<JsonObject>();
 
   String tempString = "";

@@ -1,24 +1,25 @@
-#include <LCLFileFunctions.h>
+#include <FileUtils.h>
 
-File fsUploadFile;
-
-
+//******************************************************************************************************************************
+// turnOffAllJacks() - This function is called before enabling any GPIO to ensure only one 
+// pin can be high at any given time. Otherwise the control board fuse will be blown.
+//******************************************************************************************************************************
 void turnOffAllJacks()
 {
-    digitalWrite(16, LOW);
-    digitalWrite(14, LOW);
-    digitalWrite(12, LOW);
-    digitalWrite(13, LOW);
-    digitalWrite(5, LOW);
-    digitalWrite(4, LOW);
-    digitalWrite(0, LOW);
-    digitalWrite(2, LOW);
+    digitalWrite(LF_UP_PIN, LOW);
+    digitalWrite(LF_DOWN_PIN, LOW);
+    digitalWrite(RF_UP_PIN, LOW);
+    digitalWrite(RF_DOWN_PIN, LOW);
+    digitalWrite(LR_UP_PIN, LOW);
+    digitalWrite(LR_DOWN_PIN, LOW);
+    digitalWrite(RR_UP_PIN, LOW);
+    digitalWrite(RR_DOWN_PIN, LOW);
 }
 
 //******************************************************************************************************************************
-// Format bytes
+// Given size in bytes, return string representing units suffix (ie "KB")
 //******************************************************************************************************************************
-String formatBytes(size_t bytes) {
+String getSizeSuffix(size_t bytes) {
   if (bytes < 1024) {
     return String(bytes) + "B";
   } else if (bytes < (1024 * 1024)) {
@@ -28,8 +29,11 @@ String formatBytes(size_t bytes) {
   } else {
     return String(bytes / 1024.0 / 1024.0 / 1024.0) + "GB";
   }
-}
-// determine file type by extension
+}//end getSizeSuffix()
+
+//******************************************************************************************************************************
+// Given a filename, return a String representing the type of file.
+//******************************************************************************************************************************
 String getContentType(String filename) {
   if (webServer.hasArg("download")) return "application/octet-stream";
   else if (filename.endsWith(".htm")) return "text/html";
@@ -45,50 +49,20 @@ String getContentType(String filename) {
   else if (filename.endsWith(".zip")) return "application/x-zip";
   else if (filename.endsWith(".gz")) return "application/x-gzip";
   return "text/plain";
-}//end formatBytes()
+}//end getContentType()
+
 //******************************************************************************************************************************
 // Read requested file from SPIFFS, extracting .gzip contents if required
 //******************************************************************************************************************************
 bool handleFileRead(String path) {
-  String GPIO = "";
-  int valGPIO = 0;
   Serial.println("handleFileRead: " + path);
-  Serial.print("Processing Requst: "); Serial.println(path);
-  if (path.endsWith("/")) path += "home.html";
+  if (path.endsWith("/")) {
+    path += "home.html";
+  }
+
   String contentType = getContentType(path);
   String pathWithGz = path + ".gz";
-  String pathIcons = "/icons" + path;
-
-  if (path.startsWith("/GPIO_")) {
-    // What a shitty bunch of string crap...
-    GPIO = path.substring(6,8);
-    if(GPIO.endsWith("_")){
-      GPIO = path.substring(6,7);
-    }
-    Serial.print("GPIO Selected is: ");
-    Serial.println(GPIO);
-    valGPIO=GPIO.toInt();
-    Serial.print("VAL_GPIO Selected is: ");
-    Serial.println(valGPIO);
-    
-    if (GPIO.equals("99")) {
-      Serial.println("STOP BUTTON PRESSED");
-      turnOffAllJacks();
-    }
-    else {
-      if(path.endsWith("_ON")){
-        turnOffAllJacks();
-        digitalWrite(valGPIO, HIGH); // High is on.
-      } 
-      else {
-        turnOffAllJacks();
-        digitalWrite(valGPIO, LOW);
-      }
-    }
-    webServer.send(204, "text/plain", "");
-    // Action completed.  No requirement to serve file: exit.
-    return true;                                        
-  }
+  String pathIcons = "/icons" + path;  
 
   if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(pathIcons) || SPIFFS.exists(path)) {
     if (SPIFFS.exists(pathWithGz)) {
@@ -97,28 +71,34 @@ bool handleFileRead(String path) {
     if (SPIFFS.exists(pathIcons)) {
       path = "/icons" + path;
     }
+    // load requested file from SPIFFS
+    File file = SPIFFS.open(path, "r");
+    if (!file) {
+      // Should never get here. Show 404 page instead.
+      Serial.println("SPIFFS open failed.  Show 404.");
+      delay(500);
+      return false;
+    }
+    webServer.streamFile(file, contentType);   // stream file to web reader.
+    file.close();
+    Serial.println(String("\tSent file: ") + path);
+    return true;
 
   } else {
     path = "/404.html";
     Serial.println("File not found, Load 404 Page.");
     contentType = "text/html";
+    return false;
   }
   Serial.print("Content Type is : "); Serial.print(contentType); Serial.print(" and path is : "); Serial.println(path);
-  File file = SPIFFS.open(path, "r");                   // load requested file from SPIFFS
-  if (!file) {
-    Serial.println("SPIFFS open failed.  Show 404.");   // something has gone horribly wrong (should at least find 404.html)
-    delay(500);
-    return false;                                       // calling fucntion can load a basic 404 text response
-  }
-  /* size_t sent = */webServer.streamFile(file, contentType);   // stream file to web reader.
-  file.close();
-  return true;
 }//end handleFileRead()
+
 //******************************************************************************************************************************
 // Handle file upload
 //******************************************************************************************************************************
 void handleFileUpload() {
   if (webServer.uri() != "/edit") return;
+  File fsUploadFile;
   HTTPUpload& upload = webServer.upload();
   if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
@@ -134,7 +114,8 @@ void handleFileUpload() {
       fsUploadFile.close();
     Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
   }
-}
+}//end handleFileUpload()
+
 //******************************************************************************************************************************
 // Handle file delete
 //******************************************************************************************************************************
@@ -150,6 +131,7 @@ void handleFileDelete() {
   webServer.send(200, "text/plain", "");
   path = String();
 }//end handleFileDelete()
+
 //******************************************************************************************************************************
 // Handle file create
 //******************************************************************************************************************************
@@ -170,33 +152,33 @@ void handleFileCreate() {
   //(200, "text/plain", "");
   path = String();
 }//end handleFileCreate()
-//******************************************************************************************************************************
-// Handle File List
-//******************************************************************************************************************************
+
 void handleFileList() {
   if (!webServer.hasArg("dir")) {
     webServer.send(500, "text/plain", "BAD ARGS");
     return;
   }
-
   String path = webServer.arg("dir");
   Serial.println("handleFileList: " + path);
-  Dir dir = SPIFFS.openDir(path);
+
+  File root = SPIFFS.open(path);
   path = String();
 
   String output = "[";
-  while (dir.next()) {
-    File entry = dir.openFile("r");
-    if (output != "[") output += ',';
-    bool isDir = false;
-    output += "{\"type\":\"";
-    output += (isDir) ? "dir" : "file";
-    output += "\",\"name\":\"";
-    output += String(entry.name()).substring(1);
-    output += "\"}";
-    entry.close();
+  if(root.isDirectory()){
+      File file = root.openNextFile();
+      while(file){
+          if (output != "[") {
+            output += ',';
+          }
+          output += "{\"type\":\"";
+          output += (file.isDirectory()) ? "dir" : "file";
+          output += "\",\"name\":\"";
+          output += String(file.name()).substring(1);
+          output += "\"}";
+          file = root.openNextFile();
+      }
   }
-
   output += "]";
   webServer.send(200, "text/json", output);
-}//end handleFileList
+}//end handleFileList */

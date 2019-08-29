@@ -64,15 +64,16 @@ wsServer.on('request', function(request) {
           connection.sendUTF(response);
           console.log('\x1b[1;96m%s\x1b[0m%s', 'Message sent is: \n', response);
         })
-      } else if (messageJSON.type.startsWith('save')) {
-        console.log('\x1b[1;92m%s\x1b[0m', 'Save Data request recieved: ', messageJSON.type);
-        console.log("Recieved Type is: ", messageJSON.type);
-        response = JSON.stringify({
-          "echo" : messageJSON.type
-        });
-        connection.sendUTF(response);
-        console.log('\x1b[1;96m%s\x1b[0m%s', 'Message sent is: \n', response);
-      } else {
+      } /* else if (messageJSON.type != null) {
+          if (messageJSON.type.startsWith('save')) {
+            console.log('\x1b[1;92m%s\x1b[0m', 'Save Data request recieved: ', messageJSON.type);
+            console.log("Recieved Type is: ", messageJSON.type);
+            response = JSON.stringify({"echo" : messageJSON.type});
+            connection.sendUTF(response);
+            console.log('\x1b[1;96m%s\x1b[0m%s', 'Message sent is: \n', response);
+          } 
+        } */
+      else {
         console.log('\x1b[1;91m%s\x1b[0m', 'Invalid Message Recieved.');
       }
     }
