@@ -1,6 +1,8 @@
 /*
   Camper Jack Controller
-  GPIO of ESP32 are connected to a relay driver IC, driving 4 dual relays to raise/lower 4 electric jacks on a camper.
+  GPIO of ESP32 are connected to a relay driver IC, driving 4 dual relays each used to actuate a ~100W
+  DC12V motor in forward and reverse directions.
+  The electric motors control a Bigfoot Camper's stabilizer jacks.
 
   This project has been tested as working on the ESP32 DOIT Devkit V1 development board.
   To compile the project, use VSCode with the PlatformIO extension.
@@ -27,6 +29,7 @@
 
 
 //char password[30] = "";
+
 char hostName[30] = "camper";
 
 //WifiServer wifiServer
